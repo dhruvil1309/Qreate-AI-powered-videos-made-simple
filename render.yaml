@@ -1,0 +1,22 @@
+# One-click deploy on Render: New > Blueprint > pick this repo.
+services:
+  - type: web
+    name: qreate
+    runtime: docker
+    plan: starter            # video rendering needs more than the free tier's 512 MB
+    healthCheckPath: /api/health
+    disk:
+      name: qreate-data
+      mountPath: /app/data
+      sizeGB: 5
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PEXELS_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: MAX_WORKERS
+        value: "2"

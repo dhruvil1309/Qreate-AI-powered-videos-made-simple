@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qreate — video studio for Qoneqt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#17122B; --ink-2:#4A4466; --ink-3:#8A84A3;
+  --paper:#FFFFFF; --wash:#F4F0FF; --line:#E4DEF5;
+  --violet:#6A35F0; --violet-deep:#4B1FC2; --violet-soft:#E7DEFF;
+  --ok:#0F8A5F; --bad:#C62F3B; --warn:#B26B00;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"Instrument Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --r-lg:22px; --r-md:12px; --r-sm:8px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--violet);outline-offset:2px}
+.app{display:grid;grid-template-columns:minmax(300px,380px) minmax(320px,1fr) minmax(320px,440px);min-height:100vh}
+@media (max-width:1100px){.app{grid-template-columns:1fr 1fr}.details{grid-column:1 / -1}}
+@media (max-width:720px){.app{grid-template-columns:1fr}}
+
+/* composer */
+.composer{padding:28px 28px 40px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:22px}
+.brand{display:flex;flex-direction:column;gap:2px}
+.brand h1{font-family:var(--display);font-weight:800;font-size:34px;letter-spacing:-.02em;margin:0}
+.brand span{color:var(--ink-3);font-size:14px}
+.prompt{font-family:var(--display);font-weight:500;font-size:22px;line-height:1.25;width:100%;min-height:118px;resize:vertical;border:1.5px solid var(--line);border-radius:var(--r-md);padding:14px 16px;background:var(--paper)}
+.prompt:focus{border-color:var(--violet);outline:none;box-shadow:0 0 0 4px var(--violet-soft)}
+.prompt::placeholder{color:#B7B1CC}
+.field{display:flex;flex-direction:column;gap:6px}
+.field>label,.field>.lbl{font-weight:600;font-size:13.5px;color:var(--ink-2)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+input[type=text],select,textarea.small{border:1.5px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;background:var(--paper);width:100%}
+input[type=text]:focus,select:focus,textarea.small:focus{border-color:var(--violet);outline:none}
+.seg{display:flex;background:var(--wash);border-radius:999px;padding:3px}
+.seg button{flex:1;border:0;background:transparent;border-radius:999px;padding:7px 8px;cursor:pointer;color:var(--ink-2);font-weight:500;font-size:14px}
+.seg button[aria-pressed=true]{background:var(--paper);color:var(--ink);box-shadow:0 1px 3px rgba(40,20,90,.15);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer;color:var(--ink-2);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip:hover{border-color:var(--violet);color:var(--violet-deep)}
+.go{border:0;background:var(--violet);color:#fff;font-weight:600;font-size:16px;border-radius:var(--r-md);padding:14px 18px;cursor:pointer}
+.go:hover{background:var(--violet-deep)}
+.go:disabled{opacity:.55;cursor:progress}
+.engines{font-size:13px;color:var(--ink-2);background:var(--wash);border-radius:var(--r-md);padding:12px 14px}
+.engines b{color:var(--ink)}
+.engines p{margin:2px 0}
+.history h2{font-family:var(--display);font-size:17px;margin:0 0 8px}
+.history ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;max-height:260px;overflow:auto}
+.history li button{width:100%;text-align:left;border:0;background:transparent;padding:8px 10px;border-radius:var(--r-sm);cursor:pointer;display:flex;gap:10px;align-items:center}
+.history li button:hover,.history li button[aria-current=true]{background:var(--wash)}
+.dot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--ink-3)}
+.dot.done{background:var(--ok)}.dot.failed{background:var(--bad)}.dot.running,.dot.queued{background:var(--violet);animation:pulse 1.2s infinite}.dot.needs_review{background:var(--warn)}
+@keyframes pulse{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.dot{animation:none!important}.bar i{transition:none!important}}
+.history .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+
+/* stage (phone) */
+.stage{background:var(--wash);display:flex;align-items:flex-start;justify-content:center;padding:36px 20px}
+.phone{width:min(360px,100%);background:var(--ink);border-radius:44px;padding:12px;box-shadow:0 30px 60px -20px rgba(40,15,110,.45);position:sticky;top:24px}
+.screen{width:100%;aspect-ratio:9/16;border-radius:34px;overflow:hidden;background:#211A3D;position:relative;color:#fff}
+.screen video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
+.empty{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:34px;gap:10px}
+.empty h3{font-family:var(--display);font-size:28px;line-height:1.1;margin:0}
+.empty p{color:#C9C0EA;margin:0}
+.progress{position:absolute;inset:0;padding:30px 24px;display:flex;flex-direction:column;gap:4px;background:linear-gradient(180deg,#2A1E5C,#17122B)}
+.progress h3{font-family:var(--display);font-size:21px;line-height:1.2;margin:6px 0 16px}
+.steps{list-style:none;margin:0;padding:0;counter-reset:s;display:flex;flex-direction:column;gap:11px}
+.steps li{display:grid;grid-template-columns:26px 1fr;gap:10px;align-items:start;color:#9B92C4}
+.steps li::before{counter-increment:s;content:counter(s);width:24px;height:24px;border-radius:50%;border:1.5px solid #5A4F8C;display:grid;place-items:center;font-size:12px;font-weight:600}
+.steps li.running{color:#fff}.steps li.running::before{border-color:#fff;background:#fff;color:var(--violet-deep)}
+.steps li.done{color:#D9D2F5}.steps li.done::before{content:"✓";background:#7C5CFF;border-color:#7C5CFF;color:#fff}
+.steps li.failed{color:#FFB3B9}.steps li.failed::before{content:"!";background:var(--bad);border-color:var(--bad);color:#fff}
+.steps small{display:block;color:#A79ED3;font-size:12px}
+.err{margin-top:auto;background:rgba(198,47,59,.2);border:1px solid rgba(255,140,150,.4);border-radius:var(--r-md);padding:10px 12px;font-size:13px}
+
+/* details */
+.details{padding:28px 28px 48px;border-left:1px solid var(--line);min-width:0}
+.details h2{font-family:var(--display);font-size:24px;line-height:1.2;margin:0 0 4px}
+.meta{color:var(--ink-3);font-size:13.5px;margin:0 0 18px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.tabs button{border:0;background:none;padding:10px 12px;cursor:pointer;color:var(--ink-3);font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected=true]{color:var(--ink);border-color:var(--violet)}
+.scene{border:1px solid var(--line);border-radius:var(--r-md);padding:14px;margin-bottom:12px}
+.scene header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px}
+.scene header b{font-family:var(--display);font-size:16px}
+.scene header span{font-size:12.5px;color:var(--ink-3);text-align:right}
+.scene .grid{display:grid;gap:8px}
+.scene textarea.small{min-height:64px;resize:vertical}
+.scene .actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.btn{border:1.5px solid var(--line);background:var(--paper);border-radius:var(--r-sm);padding:7px 12px;cursor:pointer;font-weight:600;font-size:13.5px}
+.btn:hover{border-color:var(--violet);color:var(--violet-deep)}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.primary:hover{background:var(--violet-deep);border-color:var(--violet-deep);color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.score{display:grid;grid-template-columns:120px 1fr 40px;gap:10px;align-items:center;margin:7px 0;font-size:14px}
+.bar{height:8px;background:var(--wash);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--violet);border-radius:99px;transition:width .5s}
+.checks{list-style:none;padding:0;margin:0}
+.checks li{display:grid;grid-template-columns:22px 1fr;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.checks li small{display:block;color:var(--ink-3)}
+.ok{color:var(--ok);font-weight:700}.no{color:var(--bad);font-weight:700}.soft{color:var(--warn);font-weight:700}
+.issues{margin:6px 0 0;padding-left:18px;color:var(--ink-2);font-size:14px}
+.post{background:var(--wash);border-radius:var(--r-md);padding:14px 16px;white-space:pre-wrap;font-size:14.5px;margin:0 0 12px}
+.dl{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 20px}
+.dl a{text-decoration:none}
+.howto{font-size:14px;color:var(--ink-2);padding-left:20px}
+.sources a{color:var(--violet-deep);word-break:break-all}
+.placeholder{color:var(--ink-3);font-size:14.5px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Composer -->
+  <section class="composer" aria-label="Create a video">
+    <div class="brand"><h1>Qreate</h1><span>video studio for the Qoneqt Global Feed</span></div>
+
+    <div class="seg" role="group" aria-label="Mode">
+      <button id="modeOne" aria-pressed="true">One video</button>
+      <button id="modeBatch" aria-pressed="false">Batch</button>
+    </div>
+
+    <div class="field">
+      <label for="topic" id="topicLabel">What should the video be about?</label>
+      <textarea id="topic" class="prompt" placeholder="Why ISRO missions cost so little"></textarea>
+      <div class="chips" id="trends" aria-label="Trending ideas"></div>
+    </div>
+
+    <div class="row">
+      <div class="field"><label for="community">Community</label><input type="text" id="community" value="Study Buddies"></div>
+      <div class="field"><label for="tone">Tone</label>
+        <select id="tone"><option>energetic</option><option>calm and clear</option><option>funny</option><option>inspiring</option><option>serious explainer</option></select></div>
+    </div>
+
+    <div class="field"><span class="lbl" id="langL">Language</span>
+      <div class="seg" role="group" aria-labelledby="langL" data-name="language">
+        <button data-v="english" aria-pressed="true">English</button><button data-v="hinglish" aria-pressed="false">Hinglish</button><button data-v="hindi" aria-pressed="false">Hindi</button>
+      </div></div>
+
+    <div class="field"><span class="lbl" id="visL">Visuals</span>
+      <div class="seg" role="group" aria-labelledby="visL" data-name="visual_style">
+        <button data-v="mix" aria-pressed="true">Mix</button><button data-v="stock" aria-pressed="false">Real footage</button><button data-v="ai" aria-pressed="false">AI images</button>
+      </div></div>
+
+    <div class="field"><span class="lbl" id="lenL">Length</span>
+      <div class="seg" role="group" aria-labelledby="lenL" data-name="target_seconds">
+        <button data-v="30" aria-pressed="false">30 s</button><button data-v="45" aria-pressed="true">45 s</button><button data-v="60" aria-pressed="false">60 s</button>
+      </div></div>
+
+    <button class="go" id="go">Make video</button>
+    <div class="engines" id="engines" aria-live="polite">Checking engines…</div>
+
+    <div class="history"><h2>Your videos</h2><ul id="history"><li class="placeholder">Videos you make show up here.</li></ul></div>
+  </section>
+
+  <!-- Phone preview -->
+  <section class="stage" aria-label="Preview">
+    <div class="phone"><div class="screen" id="screen">
+      <div class="empty"><h3>Type an idea. Get a reel.</h3><p>Qreate researches it, writes the script, critiques itself, finds visuals, records the voice and edits a 9:16 video with captions.</p></div>
+    </div></div>
+  </section>
+
+  <!-- Details -->
+  <section class="details" aria-label="Video details" id="details">
+    <h2>Nothing selected</h2>
+    <p class="meta">Make a video or pick one from your list to see its script, review and post.</p>
+  </section>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); Object.assign(e, props); kids.flat().forEach(k => e.append(k instanceof Node ? k : document.createTextNode(k ?? ""))); return e; };
+const api = async (path, opts = {}) => {
+  const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : (data.detail?.[0]?.msg || `Request failed (${r.status})`));
+  return data;
+};
+const toast = (msg) => { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); };
+
+let mode = "one", currentId = null, pollTimer = null, tab = "scenes", lastJob = null;
+const opts = { language: "english", visual_style: "mix", target_seconds: 45 };
+
+// segmented controls
+document.querySelectorAll(".seg[data-name]").forEach(seg => seg.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  const v = b.dataset.v; opts[seg.dataset.name] = isNaN(+v) ? v : +v;
+}));
+function setMode(m) {
+  mode = m; $("#modeOne").setAttribute("aria-pressed", m === "one"); $("#modeBatch").setAttribute("aria-pressed", m === "batch");
+  $("#topicLabel").textContent = m === "one" ? "What should the video be about?" : "Topics, one per line";
+  $("#topic").placeholder = m === "one" ? "Why ISRO missions cost so little" : "Why ISRO missions cost so little\nHow UPI changed payments in India\n5 study habits backed by science";
+  updateGo();
+}
+$("#modeOne").onclick = () => setMode("one"); $("#modeBatch").onclick = () => setMode("batch");
+const topicLines = () => $("#topic").value.split("\n").map(s => s.trim()).filter(Boolean);
+function updateGo() { const n = topicLines().length; $("#go").textContent = mode === "one" ? "Make video" : `Make ${n || ""} video${n === 1 ? "" : "s"}`.replace("  ", " "); }
+$("#topic").addEventListener("input", updateGo);
+
+$("#go").onclick = async () => {
+  const common = { community: $("#community").value.trim() || "General", tone: $("#tone").value, ...opts };
+  const lines = topicLines();
+  if (!lines.length) { $("#topic").focus(); toast("Type a topic first."); return; }
+  $("#go").disabled = true;
+  try {
+    if (mode === "one") {
+      const r = await api("/api/jobs", { method: "POST", body: JSON.stringify({ topic: lines.join(" "), ...common }) });
+      open(r.id); toast("Video started");
+    } else {
+      const r = await api("/api/batch", { method: "POST", body: JSON.stringify({ topics: lines, ...common }) });
+      open(r.ids[0]); toast(`${r.ids.length} videos queued`);
+    }
+    refreshHistory();
+  } catch (e) { toast(e.message); }
+  finally { $("#go").disabled = false; }
+};
+
+// engines + trends
+(async () => {
+  try {
+    const h = await api("/api/health");
+    const box = $("#engines"); box.textContent = "";
+    const line = (label, value, hint) => box.append(el("p", {}, el("b", {}, label + ": "), value, hint ? el("span", { style: "color:var(--ink-3)" }, " — " + hint) : ""));
+    line("Script", h.llm_providers.length ? h.llm_providers.join(", ") : "offline template", h.llm_providers.length ? "" : "add GEMINI_API_KEY for AI scripts");
+    line("Visuals", h.visuals.join(", "), h.visuals.includes("pexels") ? "" : "add PEXELS_API_KEY for real footage");
+    line("Voice", h.voice[0]);
+    if (h.offline_mode) line("Mode", "offline");
+  } catch { $("#engines").textContent = "Can't reach the server. Start it with: uvicorn app.main:app"; }
+  try {
+    const t = await api("/api/trends");
+    t.topics.slice(0, 6).forEach(x => $("#trends").append(el("button", { className: "chip", textContent: x, title: x, onclick: () => { $("#topic").value = mode === "one" ? x : ($("#topic").value ? $("#topic").value + "\n" : "") + x; updateGo(); } })));
+  } catch {}
+})();
+
+// history
+async function refreshHistory() {
+  try {
+    const { jobs } = await api("/api/jobs");
+    const ul = $("#history"); ul.textContent = "";
+    if (!jobs.length) { ul.append(el("li", { className: "placeholder", textContent: "Videos you make show up here." })); return; }
+    jobs.forEach(j => ul.append(el("li", {}, el("button", { onclick: () => open(j.id), ariaCurrent: j.id === currentId ? "true" : "false" },
+      el("span", { className: "dot " + j.status, title: j.status }), el("span", { className: "t", textContent: j.title || j.topic })))));
+  } catch {}
+}
+setInterval(refreshHistory, 4000); refreshHistory();
+
+// open + poll a job
+function open(id) { currentId = id; tab = tab || "scenes"; clearTimeout(pollTimer); lastJob = null; poll(); refreshHistory(); }
+async function poll() {
+  if (!currentId) return;
+  try {
+    const job = await api("/api/jobs/" + currentId);
+    const changed = !lastJob || lastJob.updated !== job.updated;
+    if (changed) { renderScreen(job, lastJob); renderDetails(job); }
+    lastJob = job;
+    if (["queued", "running"].includes(job.status)) pollTimer = setTimeout(poll, 1200);
+  } catch (e) { toast(e.message); }
+}
+
+function renderScreen(job, prev) {
+  const s = $("#screen");
+  const busy = ["queued", "running"].includes(job.status);
+  if (!busy && job.outputs.video) {
+    if (prev && prev.status === job.status && s.querySelector("video")) return;
+    s.textContent = "";
+    s.append(el("video", { src: job.outputs.video + "?t=" + Math.round(job.updated), poster: job.outputs.thumbnail + "?t=" + Math.round(job.updated), controls: true, playsInline: true, preload: "metadata" }));
+    return;
+  }
+  s.textContent = "";
+  const wrap = el("div", { className: "progress" }, el("h3", { textContent: job.request.topic }));
+  const ol = el("ol", { className: "steps" });
+  Object.values(job.stages).forEach(st => ol.append(el("li", { className: st.status }, el("span", {}, st.label, st.detail ? el("small", { textContent: st.detail }) : ""))));
+  wrap.append(ol);
+  if (job.status === "queued") wrap.append(el("p", { style: "color:#C9C0EA;margin-top:14px", textContent: "Waiting for a free worker…" }));
+  if (job.error) wrap.append(el("div", { className: "err", textContent: job.error }));
+  s.append(wrap);
+}
+
+function renderDetails(job) {
+  const d = $("#details"); d.textContent = "";
+  const plan = job.plan;
+  d.append(el("h2", { textContent: plan?.title || job.request.topic }));
+  const statusText = { queued: "Queued", running: "Making the video", done: "Ready to post", needs_review: "Ready, with QA warnings", failed: "Failed" }[job.status] || job.status;
+  d.append(el("p", { className: "meta", textContent: `${statusText} · ${job.request.community} · ${job.request.language} · ${job.request.target_seconds}s` }));
+  const tabs = el("div", { className: "tabs", role: "tablist" });
+  [["scenes", "Scenes"], ["review", "Review"], ["post", "Post"]].forEach(([k, label]) =>
+    tabs.append(el("button", { role: "tab", ariaSelected: tab === k ? "true" : "false", textContent: label, onclick: () => { tab = k; renderDetails(job); } })));
+  d.append(tabs);
+  const body = el("div", { role: "tabpanel" }); d.append(body);
+  if (!plan) { body.append(el("p", { className: "placeholder", textContent: "The script appears here once it's written." })); return; }
+  if (tab === "scenes") renderScenes(body, job);
+  if (tab === "review") renderReview(body, job);
+  if (tab === "post") renderPost(body, job);
+}
+
+function renderScenes(body, job) {
+  const busy = ["queued", "running"].includes(job.status);
+  job.plan.scenes.forEach((sc, i) => {
+    const asset = job.scene_assets?.[i];
+    const cap = el("input", { type: "text", value: sc.caption, ariaLabel: `Scene ${i + 1} on-screen text` });
+    const vo = el("textarea", { className: "small", value: sc.voiceover, ariaLabel: `Scene ${i + 1} voiceover` });
+    const q = el("input", { type: "text", value: sc.visual.mode === "ai_image" ? (sc.visual.prompt || sc.visual.query) : sc.visual.query, ariaLabel: `Scene ${i + 1} visual` });
+    const save = el("button", { className: "btn primary", textContent: "Save and re-render", disabled: busy });
+    const reroll = el("button", { className: "btn", textContent: "Try another visual", disabled: busy });
+    save.onclick = () => regen(i + 1, { caption: cap.value, voiceover: vo.value, ...(sc.visual.mode === "ai_image" ? { visual_prompt: q.value } : { visual_query: q.value }) });
+    reroll.onclick = () => regen(i + 1, {});
+    body.append(el("div", { className: "scene" },
+      el("header", {}, el("b", { textContent: `Scene ${i + 1}` }), el("span", { textContent: asset ? `${asset.visual_source} · ${asset.duration}s` : (sc.visual.mode === "ai_image" ? "AI image" : "Footage") })),
+      el("div", { className: "grid" },
+        el("div", { className: "field" }, el("label", { textContent: "On-screen text" }), cap),
+        el("div", { className: "field" }, el("label", { textContent: "Voiceover" }), vo),
+        el("div", { className: "field" }, el("label", { textContent: sc.visual.mode === "ai_image" ? "Image prompt" : "Footage search" }), q)),
+      el("div", { className: "actions" }, save, reroll)));
+  });
+}
+async function regen(n, edit) {
+  try { await api(`/api/jobs/${currentId}/scenes/${n}/regenerate`, { method: "POST", body: JSON.stringify(edit) }); toast(`Re-rendering scene ${n}`); lastJob = null; poll(); }
+  catch (e) { toast(e.message); }
+}
+
+function renderReview(body, job) {
+  const c = job.critique;
+  body.append(el("h3", { style: "font-family:var(--display);margin:0 0 6px", textContent: "Critic" }));
+  if (c) {
+    body.append(el("p", { className: "meta", style: "margin-bottom:6px", textContent: `${c.overall}/10 overall · ${c.rounds} rewrite${c.rounds === 1 ? "" : "s"} · judged by ${c.judged_by}` }));
+    Object.entries(c.scores).forEach(([k, v]) => body.append(el("div", { className: "score" },
+      el("span", { textContent: k.replace("_", " ") }), el("div", { className: "bar" }, el("i", { style: `width:${v * 10}%` })), el("b", { textContent: v }))));
+    if (c.issues.length) body.append(el("ul", { className: "issues" }, c.issues.map(t => el("li", { textContent: t }))));
+  } else body.append(el("p", { className: "placeholder", textContent: "Scores appear after the critic runs." }));
+  body.append(el("h3", { style: "font-family:var(--display);margin:22px 0 6px", textContent: "Quality checks" }));
+  if (job.qa) body.append(el("ul", { className: "checks" }, job.qa.checks.map(ch => el("li", {},
+    el("span", { className: ch.pass ? "ok" : (ch.blocking ? "no" : "soft"), textContent: ch.pass ? "✓" : "!" , ariaLabel: ch.pass ? "passed" : "failed" }),
+    el("span", {}, ch.check, el("small", { textContent: ch.detail }))))));
+  else body.append(el("p", { className: "placeholder", textContent: "Checks run after the video is edited." }));
+}
+
+function renderPost(body, job) {
+  const p = job.plan;
+  const text = `${p.title}\n\n${p.description}\n\n${p.hashtags.join(" ")}`;
+  body.append(el("pre", { className: "post", textContent: text }));
+  const copy = el("button", { className: "btn", textContent: "Copy caption" });
+  copy.onclick = async () => { try { await navigator.clipboard.writeText(text); toast("Caption copied"); } catch { toast("Select the text and copy it manually."); } };
+  const dl = el("div", { className: "dl" }, copy);
+  if (job.outputs.video) {
+    dl.append(el("a", { className: "btn primary", href: job.outputs.video + "?download=true", textContent: "Download video" }));
+    dl.append(el("a", { className: "btn", href: job.outputs.package, textContent: "Download package" }));
+  }
+  body.append(dl);
+  body.append(el("h3", { style: "font-family:var(--display);margin:0 0 6px", textContent: "Post it on Qoneqt" }));
+  body.append(el("ol", { className: "howto" },
+    el("li", { textContent: "Download the video and copy the caption." }),
+    el("li", { textContent: `Open Qoneqt, create a post in the ${job.request.community} community or the Global Feed.` }),
+    el("li", { textContent: "Upload the video, paste the caption and hashtags, and mark it as AI-generated." })));
+  if (p.sources?.length) {
+    body.append(el("h3", { style: "font-family:var(--display);margin:18px 0 6px", textContent: "Sources used" }));
+    body.append(el("ul", { className: "sources" }, p.sources.map(s => el("li", {}, el("a", { href: s.url, target: "_blank", rel: "noopener", textContent: s.title })))));
+  }
+}
+</script>
+</body>
+</html>
