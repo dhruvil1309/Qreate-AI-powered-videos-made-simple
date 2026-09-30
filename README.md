@@ -21,6 +21,48 @@
 ![Tests](https://img.shields.io/badge/regression_tests-5_passing-2ECC71?style=flat-square)
 ![Docker](https://img.shields.io/badge/deploy-Docker_%7C_Render-2496ED?style=flat-square&logo=docker&logoColor=white)
 
+![Team](https://img.shields.io/badge/Team-Fantastic_Four-7C3AED?style=for-the-badge&logo=github&logoColor=white)
+![Team ID](https://img.shields.io/badge/Team_ID-team--7D4CF0F857DD-334155?style=for-the-badge)
+![Challenge](https://img.shields.io/badge/Qoneqt_×_CTRL_FREAK-Challenge-A3E635?style=for-the-badge&labelColor=1E1B4B)
+
+</div>
+
+---
+
+## 🎥 Demo video
+
+<div align="center">
+
+<a href="https://youtu.be/41FZuaFv9hQ" title="Watch the Qreate demo on YouTube">
+  <img src="https://img.youtube.com/vi/41FZuaFv9hQ/maxresdefault.jpg" alt="Qreate demo video by Team Fantastic Four. Click to play on YouTube." width="760">
+</a>
+
+<br/><br/>
+
+<a href="https://youtu.be/41FZuaFv9hQ">
+  <img src="https://img.shields.io/badge/▶_Watch_the_demo-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch the demo on YouTube">
+</a>
+
+<br/>
+
+<sub>👆 Click the preview to play the full demo on YouTube · <a href="https://youtu.be/41FZuaFv9hQ">youtu.be/41FZuaFv9hQ</a></sub>
+
+</div>
+
+---
+
+## 👥 Team
+
+<div align="center">
+
+| | |
+|:--|:--|
+| 🦸 **Team name** | **Fantastic Four** |
+| 🆔 **Team ID** | `team-7D4CF0F857DD` |
+| 🏆 **Challenge** | Qoneqt × CTRL FREAK |
+| 🎥 **Demo video** | [youtu.be/41FZuaFv9hQ](https://youtu.be/41FZuaFv9hQ) |
+| 💻 **Repository** | [dhruvil1309/Qreate-AI-powered-videos-made-simple](https://github.com/dhruvil1309/Qreate-AI-powered-videos-made-simple) |
+
 </div>
 
 ---
@@ -69,6 +111,12 @@ voices. It also includes an optional native integration with the official
 ---
 
 ## 🧭 Contents
+
+<div align="center">
+
+**Quick links:** [🎥 Demo video](#-demo-video) · [👥 Team](#-team) · [⚡ Quick start](#-quick-start)
+
+</div>
 
 <table>
 <tr>
@@ -1601,6 +1649,10 @@ validating a production run.
 <div align="center">
 
 **Qreate** · AI-assisted vertical video production for the Qoneqt Global Feed
+
+Built with 💜 by **Team Fantastic Four** · Team ID `team-7D4CF0F857DD`
+
+[▶️ Demo video](https://youtu.be/41FZuaFv9hQ) · [💻 GitHub repository](https://github.com/dhruvil1309/Qreate-AI-powered-videos-made-simple)
 
 *Review every video before you publish, and always disclose AI generation.*
 
