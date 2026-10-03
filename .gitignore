@@ -5,3 +5,8 @@ data/
 .pytest_cache/
 *.part
 .venv/
+
+# UAT run artefacts (the plan and the runner are tracked; results are not)
+tests/uat/screenshots/
+tests/uat/server.log
+tests/uat/REPORT.md

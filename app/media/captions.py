@@ -36,7 +36,9 @@ def _font(size: int, devanagari: bool = False) -> ImageFont.FreeTypeFont:
     try:
         return ImageFont.truetype(path, size, **kwargs)
     except OSError:
-        return ImageFont.load_default()
+        # Pillow's bare default is a ~10px bitmap font, which makes captions
+        # unreadable on a 1080x1920 frame. Ask for its scalable face instead.
+        return ImageFont.load_default(size)
 
 
 def _is_devanagari(text: str) -> bool:

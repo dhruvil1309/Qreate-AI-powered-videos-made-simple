@@ -47,6 +47,8 @@ TAVILY_API_KEY = _env("TAVILY_API_KEY")  # optional; Wikipedia is always tried
 PEXELS_API_KEY = _env("PEXELS_API_KEY")
 USE_POLLINATIONS = _env("USE_POLLINATIONS", "1") == "1"  # free AI image generation, no key
 POLLINATIONS_MODEL = _env("POLLINATIONS_MODEL", "flux")
+POLLINATIONS_RETRIES = int(_env("POLLINATIONS_RETRIES", "6"))  # free tier allows ~1 image per 50s
+POLLINATIONS_WAIT = float(_env("POLLINATIONS_WAIT", "15"))  # seconds between retries
 WAN_ENABLED = _env("WAN_ENABLED", "1") == "1"
 WAN_RUNTIME_DIR = Path(_env("WAN_RUNTIME_DIR", str(ROOT / ".venv" / "wan2.1-runtime")))
 WAN_MODEL_DIR = Path(
@@ -87,9 +89,37 @@ HTTP_TIMEOUT = float(_env("HTTP_TIMEOUT", "45"))
 # ---- Video format (Qoneqt Global Feed: vertical) ----
 WIDTH, HEIGHT, FPS = 1080, 1920, 30
 
-FONT_BOLD = _env("FONT_BOLD", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
-FONT_DEVANAGARI = _env(
-    "FONT_DEVANAGARI", "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
+_WIN_FONTS = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts"
+
+
+def _first_font(env_name: str, *candidates: str | Path) -> str:
+    """An explicit env var wins; otherwise the first candidate that exists here.
+
+    The defaults used to be Linux paths only, so on Windows or macOS Pillow
+    fell back to its 10px bitmap font and every caption was unreadable.
+    """
+    explicit = _env(env_name)
+    if explicit:
+        return explicit
+    for c in candidates:
+        if Path(c).exists():
+            return str(c)
+    return str(candidates[0])
+
+
+FONT_BOLD = _first_font(
+    "FONT_BOLD",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Debian/Ubuntu and the Docker image
+    _WIN_FONTS / "segoeuib.ttf",
+    _WIN_FONTS / "arialbd.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+)
+FONT_DEVANAGARI = _first_font(
+    "FONT_DEVANAGARI",
+    "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf",
+    _WIN_FONTS / "NirmalaB.ttf",
+    _WIN_FONTS / "Nirmala.ttf",
+    "/System/Library/Fonts/Supplemental/Devanagari Sangam MN.ttc",
 )
 
 

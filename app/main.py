@@ -5,19 +5,24 @@ Docs: http://localhost:8000/docs
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import shutil
+import time
 import uuid
 from pathlib import Path
+from typing import AsyncIterator, Callable
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import ValidationError
 
 from . import config
-from .jobs import executor, store
-from .models import BatchRequest, JobRequest, SceneEdit
-from .pipeline import regenerate_scene, run_job
+from .jobs import TERMINAL, executor, progress_of, store
+from .models import BatchRequest, HookPick, JobRequest, PlanEdit, SceneEdit, ScenePlan
+from .pipeline import ensure_poster, regenerate_scene, run_job, write_package
 from .providers.research import trending_topics
 from .providers import wan
 
@@ -30,6 +35,13 @@ def _job_or_404(job_id: str) -> dict:
     job = store.get(job_id)
     if not job:
         raise HTTPException(404, f"No job with id {job_id}")
+    return job
+
+
+def _with_output_urls(job: dict) -> dict:
+    """Swap absolute disk paths for the URLs the studio can actually fetch."""
+    job["outputs"] = {k: f"/api/jobs/{job['id']}/{k}" for k in job["outputs"]}
+    job["progress"] = progress_of(job)
     return job
 
 
@@ -68,28 +80,157 @@ def create_job(req: JobRequest):
 
 @app.post("/api/batch", status_code=202)
 def create_batch(req: BatchRequest):
+    topics = [t.strip() for t in req.topics if t.strip()]
+    if not topics:
+        raise HTTPException(422, "Add at least one topic, one per line.")
+    # Validate every topic before queueing any, so one bad line doesn't leave half a batch.
+    opts = req.model_dump(exclude={"topics"})
+    reqs = []
+    for n, topic in enumerate(topics, 1):
+        try:
+            reqs.append(JobRequest(topic=topic, **opts))
+        except ValidationError as e:
+            raise HTTPException(422, f"Topic {n} ({topic[:40]!r}): {e.errors()[0]['msg']}") from e
     batch_id = "b-" + uuid.uuid4().hex[:6]
     ids = []
-    for topic in [t.strip() for t in req.topics if t.strip()]:
-        jr = JobRequest(topic=topic, **req.model_dump(exclude={"topics"}))
+    for jr in reqs:
         job = store.create(jr, batch_id=batch_id)
         executor.submit(run_job, store, job["id"])
         ids.append(job["id"])
-    if not ids:
-        raise HTTPException(422, "Add at least one topic, one per line.")
     return {"batch_id": batch_id, "ids": ids}
 
 
 @app.get("/api/jobs")
 def list_jobs():
-    return {"jobs": store.list()}
+    return {"jobs": store.list(), "stats": store.stats()}
+
+
+@app.get("/api/stats")
+def stats():
+    return store.stats()
+
+
+# ------------------------------------------------------------------ live streams
+async def _sse(request: Request, snapshot: Callable[[], object], done: Callable[[object], bool]) -> StreamingResponse:
+    """Push `snapshot()` to the browser whenever the job store changes.
+
+    The studio keeps one of these open instead of polling, so progress appears
+    the moment a stage flips. Heartbeat comments keep proxies from closing it.
+    """
+
+    async def events() -> AsyncIterator[str]:
+        last_rev, last_beat = -1, 0.0
+        while True:
+            if await request.is_disconnected():
+                return
+            if store.revision != last_rev:
+                last_rev = store.revision
+                payload = snapshot()
+                if payload is None:
+                    yield "event: gone\ndata: {}\n\n"
+                    return
+                yield f"data: {json.dumps(payload, ensure_ascii=False, default=str)}\n\n"
+                if done(payload):
+                    # Tell the client to close: EventSource would otherwise reconnect forever.
+                    yield "event: end\ndata: {}\n\n"
+                    return
+            if time.monotonic() - last_beat > 15:
+                last_beat = time.monotonic()
+                yield ": keepalive\n\n"
+            await asyncio.sleep(0.35)
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+    )
+
+
+@app.get("/api/stream/jobs")
+async def stream_jobs(request: Request):
+    return await _sse(request, lambda: {"jobs": store.list(), "stats": store.stats()}, lambda _: False)
+
+
+@app.get("/api/stream/jobs/{job_id}")
+async def stream_job(request: Request, job_id: str):
+    _job_or_404(job_id)
+
+    def snapshot():
+        job = store.get(job_id)
+        return _with_output_urls(job) if job else None
+
+    # Stop streaming once the job can no longer change on its own.
+    return await _sse(request, snapshot, lambda j: j["status"] in TERMINAL)
 
 
 @app.get("/api/jobs/{job_id}")
 def get_job(job_id: str):
+    return _with_output_urls(_job_or_404(job_id))
+
+
+@app.delete("/api/jobs/{job_id}")
+def delete_job(job_id: str):
     job = _job_or_404(job_id)
-    job["outputs"] = {k: f"/api/jobs/{job_id}/{k}" for k in job["outputs"]}
-    return job
+    if job["status"] in ("queued", "running"):
+        raise HTTPException(409, "This video is still being made. Wait for it to finish before deleting it.")
+    store.delete(job_id)
+    return {"id": job_id, "deleted": True}
+
+
+@app.post("/api/jobs/{job_id}/retry", status_code=202)
+def retry_job(job_id: str):
+    job = _job_or_404(job_id)
+    if job["status"] in ("queued", "running"):
+        raise HTTPException(409, "This video is already being made.")
+    store.reset(job_id)
+    executor.submit(run_job, store, job_id)
+    return {"id": job_id, "status": "queued"}
+
+
+def _plan_or_409(job: dict) -> ScenePlan:
+    if not job.get("plan"):
+        raise HTTPException(409, "This job has no scene plan yet.")
+    return ScenePlan.model_validate(job["plan"])
+
+
+@app.patch("/api/jobs/{job_id}/plan")
+def edit_plan(job_id: str, edit: PlanEdit):
+    """Edit the post copy. Nothing is re-rendered: only the package is rewritten."""
+    job = _job_or_404(job_id)
+    if job["status"] in ("queued", "running"):
+        raise HTTPException(409, "This video is still being made. Wait for it to finish, then edit the post.")
+    plan = _plan_or_409(job)
+    fields = edit.model_dump(exclude_none=True)
+    if not fields:
+        raise HTTPException(422, "Nothing to change.")
+    plan = plan.model_copy(update=fields)
+    plan = ScenePlan.model_validate(plan.model_dump())  # re-run hashtag normalisation
+    store.update(job_id, plan=plan.model_dump())
+    if job["outputs"].get("package"):
+        write_package(store.dir(job_id), plan)
+    store.log(job_id, f"Post copy edited ({', '.join(fields)})")
+    return {"id": job_id, "plan": plan.model_dump()}
+
+
+@app.post("/api/jobs/{job_id}/hook", status_code=202)
+def pick_hook(job_id: str, pick: HookPick):
+    """Swap the opening line, then re-render only the first scene."""
+    job = _job_or_404(job_id)
+    if job["status"] in ("queued", "running"):
+        raise HTTPException(409, "This video is still being made. Wait for it to finish, then change the hook.")
+    plan = _plan_or_409(job)
+    text = (pick.text or "").strip()
+    if not text:
+        if pick.index is None:
+            raise HTTPException(422, "Send a hook index or some text.")
+        if pick.index >= len(plan.hook_options):
+            raise HTTPException(422, f"Only {len(plan.hook_options)} hook options exist.")
+        text = plan.hook_options[pick.index].strip()
+    if text == plan.scenes[0].voiceover.strip():
+        raise HTTPException(409, "That is already the opening line.")
+    store.update(job_id, status="running")
+    executor.submit(regenerate_scene, store, job_id, 0, SceneEdit(voiceover=text))
+    return {"id": job_id, "status": "running", "hook": text}
 
 
 @app.post("/api/jobs/{job_id}/scenes/{scene_no}/regenerate", status_code=202)
@@ -129,6 +270,35 @@ def thumb(job_id: str):
 @app.get("/api/jobs/{job_id}/package")
 def package(job_id: str):
     return _file(job_id, "package", "application/zip", download=True)
+
+
+def _scene_dir_or_404(job_id: str, scene_no: int) -> Path:
+    job = _job_or_404(job_id)
+    n = len((job.get("plan") or {}).get("scenes") or [])
+    if not 1 <= scene_no <= max(n, 1):
+        raise HTTPException(404, f"Scene {scene_no} does not exist.")
+    return config.JOBS_DIR / job_id / "scenes" / f"{scene_no - 1:02d}"
+
+
+def _scene_file(job_id: str, scene_no: int, name: str, media: str):
+    path = _scene_dir_or_404(job_id, scene_no) / name
+    if not path.exists():
+        raise HTTPException(404, f"Scene {scene_no} has no {name} yet.")
+    return FileResponse(path, media_type=media)
+
+
+@app.get("/api/jobs/{job_id}/scenes/{scene_no}/poster")
+def scene_poster(job_id: str, scene_no: int):
+    # Built lazily, so scenes rendered before posters existed still have one.
+    poster = ensure_poster(_scene_dir_or_404(job_id, scene_no))
+    if not poster:
+        raise HTTPException(404, f"Scene {scene_no} has not been rendered yet.")
+    return FileResponse(poster, media_type="image/jpeg")
+
+
+@app.get("/api/jobs/{job_id}/scenes/{scene_no}/clip")
+def scene_clip(job_id: str, scene_no: int):
+    return _scene_file(job_id, scene_no, "scene.mp4", "video/mp4")
 
 
 @app.exception_handler(Exception)

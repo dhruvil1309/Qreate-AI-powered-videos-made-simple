@@ -12,7 +12,9 @@ import httpx
 from .. import config
 
 log = logging.getLogger("qreate.research")
-UA = {"User-Agent": "Qreate/1.0 (Qoneqt CTRL FREAK hackathon; content pipeline)"}
+# Wikimedia's robot policy rejects (403) user agents without a contact URL or email.
+UA = {"User-Agent": "Qreate/1.0 (https://github.com/dhruvil1309/Qreate-AI-powered-videos-made-simple; "
+                    "Qoneqt CTRL FREAK hackathon)"}
 
 
 def _tavily(query: str) -> list[dict]:

@@ -66,6 +66,7 @@ def render_one(d: Path, req: JobRequest, plan: ScenePlan, i: int, meta: dict) ->
     key = hashlib.md5(json.dumps([meta, scene.caption, round(dur, 3), req.community]).encode()).hexdigest()
     key_p = sd / "render.key"
     if out.exists() and key_p.exists() and key_p.read_text() == key:
+        ensure_poster(sd)  # cheap: only runs if the poster is missing
         return out  # cached
     cap_dir = sd / "captions"
     shutil.rmtree(cap_dir, ignore_errors=True)
@@ -73,8 +74,49 @@ def render_one(d: Path, req: JobRequest, plan: ScenePlan, i: int, meta: dict) ->
                                             community=req.community if i == 0 else "")
     lst = captions.write_concat_list(states, sd / "captions.txt")
     compose.render_scene(i, meta["visual"], meta["voice"]["path"], lst, dur, out)
+    (sd / "poster.jpg").unlink(missing_ok=True)
+    ensure_poster(sd)
     key_p.write_text(key, encoding="utf-8")
     return out
+
+
+def ensure_poster(scene_dir: Path) -> Path | None:
+    """A still from the middle of a scene, so the studio can show real thumbnails.
+
+    Generated on demand as well as at render time, so jobs rendered by an
+    older build get thumbnails the first time anyone looks at them.
+    """
+    poster, clip = scene_dir / "poster.jpg", scene_dir / "scene.mp4"
+    if poster.exists():
+        return poster
+    if not clip.exists():
+        return None
+    try:
+        compose.thumbnail(clip, poster, at=max(0.4, ff.duration(str(clip)) / 2))
+        return poster
+    except Exception:  # noqa: BLE001 - a missing thumbnail must never fail a render
+        log.debug("poster failed for %s", clip, exc_info=True)
+        return None
+
+
+# ------------------------------------------------------------------ packaging
+def write_package(d: Path, plan: ScenePlan) -> Path:
+    """Write post.txt + plan.json and re-zip the publishable package."""
+    out_dir = d / "output"
+    out_dir.mkdir(exist_ok=True)
+    post = [
+        plan.title, "", plan.description, "", " ".join(plan.hashtags), "",
+        "Made with AI (Qreate). Please label as AI-generated when posting.",
+    ]
+    if plan.sources:
+        post += ["", "Sources:"] + [f"- {s['title']}: {s['url']}" for s in plan.sources]
+    (out_dir / "post.txt").write_text("\n".join(post), encoding="utf-8")
+    (out_dir / "plan.json").write_text(plan.model_dump_json(indent=2), encoding="utf-8")
+    pkg = d / "package.zip"
+    with zipfile.ZipFile(pkg, "w", zipfile.ZIP_DEFLATED) as z:
+        for f in out_dir.iterdir():
+            z.write(f, f.name)
+    return pkg
 
 
 # ------------------------------------------------------------------ stages
@@ -129,18 +171,7 @@ def _finish(store: JobStore, job_id: str, d: Path, req: JobRequest, plan: SceneP
     store.stage(job_id, "qa", "done" if qa["passed"] else "failed", f"{n_ok}/{len(qa['checks'])} checks passed")
 
     store.stage(job_id, "package", "running")
-    post = [
-        plan.title, "", plan.description, "", " ".join(plan.hashtags), "",
-        "Made with AI (Qreate). Please label as AI-generated when posting.",
-    ]
-    if plan.sources:
-        post += ["", "Sources:"] + [f"- {s['title']}: {s['url']}" for s in plan.sources]
-    (out_dir / "post.txt").write_text("\n".join(post), encoding="utf-8")
-    (out_dir / "plan.json").write_text(plan.model_dump_json(indent=2), encoding="utf-8")
-    pkg = d / "package.zip"
-    with zipfile.ZipFile(pkg, "w", zipfile.ZIP_DEFLATED) as z:
-        for f in out_dir.iterdir():
-            z.write(f, f.name)
+    pkg = write_package(d, plan)
     store.stage(job_id, "package", "done", "Video, thumbnail, caption and hashtags ready")
     store.update(job_id, qa=qa, outputs={"video": str(final), "thumbnail": str(thumb), "package": str(pkg)},
                  status="done" if qa["passed"] else "needs_review")
@@ -182,11 +213,16 @@ def run_job(store: JobStore, job_id: str) -> None:
         _finish(store, job_id, d, req, plan, crit, clips)
     except Exception as e:  # noqa: BLE001
         log.exception("job %s failed", job_id)
-        running = [k for k, v in (store.get(job_id) or {}).get("stages", {}).items() if v["status"] == "running"]
-        for k in running:
-            store.stage(job_id, k, "failed", str(e)[:300])
-        store.update(job_id, status="failed", error=f"{type(e).__name__}: {str(e)[:500]}")
-        store.log(job_id, traceback.format_exc()[-1500:])
+        _fail(store, job_id, e)
+
+
+def _fail(store: JobStore, job_id: str, e: Exception) -> None:
+    """Mark whatever was running as failed so the studio never shows a stage spinning forever."""
+    running = [k for k, v in (store.get(job_id) or {}).get("stages", {}).items() if v["status"] == "running"]
+    for k in running:
+        store.stage(job_id, k, "failed", str(e)[:300])
+    store.update(job_id, status="failed", error=f"{type(e).__name__}: {str(e)[:500]}")
+    store.log(job_id, traceback.format_exc()[-1500:])
 
 
 def regenerate_scene(store: JobStore, job_id: str, scene_idx: int, edit: SceneEdit) -> None:
@@ -230,4 +266,4 @@ def regenerate_scene(store: JobStore, job_id: str, scene_idx: int, edit: SceneEd
         _finish(store, job_id, d, req, plan, crit, clips)
     except Exception as e:  # noqa: BLE001
         log.exception("regenerate failed")
-        store.update(job_id, status="failed", error=f"{type(e).__name__}: {str(e)[:500]}")
+        _fail(store, job_id, e)

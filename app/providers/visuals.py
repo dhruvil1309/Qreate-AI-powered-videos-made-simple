@@ -11,6 +11,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import random
+import threading
+import time
 import urllib.parse
 from pathlib import Path
 
@@ -31,6 +33,9 @@ PALETTES = [
     ((49, 46, 129), (147, 51, 234)),
     ((88, 28, 135), (234, 88, 12)),
 ]
+
+
+_POLLINATIONS_LOCK = threading.Lock()
 
 
 def _key(*parts: str) -> str:
@@ -118,7 +123,19 @@ def _pollinations(prompt: str, seed: int) -> dict | None:
         + urllib.parse.quote(full)
         + f"?width={config.WIDTH}&height={config.HEIGHT}&nologo=true&seed={seed}&model={config.POLLINATIONS_MODEL}"
     )
-    _download(url, dest, timeout=120)
+    # The anonymous tier allows roughly one image every 20-30 seconds and answers
+    # 402/429 otherwise. Queue scenes behind one lock and wait the limit out,
+    # rather than dropping every scene after the first straight to a title card.
+    with _POLLINATIONS_LOCK:
+        for attempt in range(config.POLLINATIONS_RETRIES + 1):
+            try:
+                _download(url, dest, timeout=120)
+                break
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code not in (402, 429) or attempt == config.POLLINATIONS_RETRIES:
+                    raise
+                log.info("Pollinations rate limit; retrying in %ss", config.POLLINATIONS_WAIT)
+                time.sleep(config.POLLINATIONS_WAIT)
     Image.open(dest).verify()  # make sure it is a real image
     return {"path": str(dest), "kind": "image", "source": f"AI image ({config.POLLINATIONS_MODEL} via Pollinations)"}
 

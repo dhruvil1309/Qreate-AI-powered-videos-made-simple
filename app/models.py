@@ -83,3 +83,19 @@ class SceneEdit(BaseModel):
     visual_query: Optional[str] = None
     visual_prompt: Optional[str] = None
     visual_mode: Optional[Literal["stock", "ai_image"]] = None
+
+
+class PlanEdit(BaseModel):
+    """Post copy that can be changed without re-rendering any video."""
+
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
+    cta: Optional[str] = Field(None, max_length=200)
+    hashtags: Optional[list[str]] = Field(None, max_length=12)
+
+
+class HookPick(BaseModel):
+    """Swap the opening line for one of the script agent's alternative hooks."""
+
+    index: Optional[int] = Field(None, ge=0, le=11, description="Index into plan.hook_options")
+    text: Optional[str] = Field(None, min_length=3, max_length=400, description="Custom hook line")
