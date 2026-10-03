@@ -32,6 +32,7 @@
 
 <p align="center">
   <a href="https://qoneqt.com/qlips/8080"><b>▶ Our reel on Qoneqt</b></a> ·
+  <a href="https://youtu.be/41FZuaFv9hQ"><b>🎥 Demo video</b></a> ·
   <a href="#demo">Demo</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#how-it-works">How it works</a> ·
@@ -60,6 +61,9 @@
 | 🔑 **Team code** | `team-7D4CF0F857DD` |
 | 🧑‍💻 **Members** | Dhruvil Prajapati · Ronak Hinglajiya · Mihir Bhavsar · Vishwa Patel |
 | 🏁 **Challenge** | Qoneqt × CTRL FREAK 2026: LLM-Powered Content Pipeline |
+| 🎥 **Demo video** | [youtu.be/41FZuaFv9hQ](https://youtu.be/41FZuaFv9hQ) |
+| 📱 **Our reel on Qoneqt** | [qoneqt.com/qlips/8080](https://qoneqt.com/qlips/8080) |
+| 💻 **Repository** | [dhruvil1309/Qreate-AI-powered-videos-made-simple](https://github.com/dhruvil1309/Qreate-AI-powered-videos-made-simple) |
 
 ---
 
@@ -78,11 +82,19 @@ This is our **customised, LLM-generated video**, made end to end with Qreate and
 - the pipeline generated the visuals and the voice, then edited, captioned and quality-checked the reel;
 - we published the final reel as a Qoneqt Qlip.
 
-🎬 **Walkthrough video (3:52):** our submission video records one real reel being made live in the studio,
-"How Chandrayaan-3 landed on the Moon". It then shows every feature and explains the LLM layer, the tech
-stack and how Qreate answers the problem statement.
+### 🎥 Demo video
 
-<!-- Add the public link to the demo video here, e.g. [▶ Watch the demo](https://...) -->
+<p align="center">
+  <a href="https://youtu.be/41FZuaFv9hQ" title="Watch the Qreate demo on YouTube">
+    <img src="https://img.youtube.com/vi/41FZuaFv9hQ/maxresdefault.jpg" alt="Qreate demo video by Team Fantastic Four. Click to play on YouTube." width="760">
+  </a>
+  <br><br>
+  <a href="https://youtu.be/41FZuaFv9hQ"><img src="https://img.shields.io/badge/▶_Watch_the_demo-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch the demo on YouTube"></a>
+  <br>
+  <sub>👆 Click the preview to play the full demo on YouTube · <a href="https://youtu.be/41FZuaFv9hQ">youtu.be/41FZuaFv9hQ</a></sub>
+</p>
+
+### 📡 See it in action
 
 <table>
   <tr>
